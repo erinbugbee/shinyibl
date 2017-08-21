@@ -84,10 +84,10 @@ ui <- fluidPage(
         column(10, ggvisOutput("bvPlot"))
       ),
       fluidRow(
-        column(12, ggvisOutput("actsPlot"))
+        column(12, ggvisOutput("probPlot"))
       ),
       fluidRow(
-        column(12, ggvisOutput("probPlot"))
+        column(12, ggvisOutput("actsPlot"))
       )
     )
   )
