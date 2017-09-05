@@ -6,8 +6,8 @@ library(tidyr)
 library(rhandsontable)
 library(data.table)
 
-#cat("Got here", file=stderr())
 
+# Initial values and names for input table
 init <- data.table(V1 = c(0, 10),
                    V2 = c(100, 20),
                    p1 = c(.1, .5))
@@ -18,9 +18,10 @@ name_out <- c("O1", "O2", "p(O1)", "p(O2)", "EV")
 name_in <- c("V1", "V2", "p1", "p2", "ev")
 rownames(init) <- rows
 
-# Define UI for application that draws a histogram
+# Define UI
 ui <- fluidPage(
   titlePanel("Shiny IBL"),
+  # following fluidRow imlements the loading message while simulation is running
   fluidRow(
     tags$style(type="text/css", "
                #loadmessage {
@@ -93,12 +94,13 @@ ui <- fluidPage(
   )
 )
 
-# Define server logic required to draw a histogram
+# Define server
 server <- function(input, output) {
-  # IBL calculation
+  # IBL calculation function
   iblCalc <- function(idx, v_a1, v_a2, v_b1, v_b2, pa, pb, decay, trial, sigma, timer) {
     # get IBl predictions for current gamble/participant sampling period
     tau <- sigma * sqrt(2)
+    # set up memory structure and sets pre-populated values as 10% larger than largest outcome
     pval <- c(v_a1, v_a2, v_b1, v_b2)
     pp <- max(pval[c(pa, 1 - pa, pb, 1 - pb) > 0])
     pp <- pp * 1.1
@@ -110,27 +112,32 @@ server <- function(input, output) {
                       paste0("2_2_", as.character(v_b2)),
                       as.character(pp)))
     mem[names(mem) == pp] <- 1
-    ns <- matrix(runif(trial * 6), ncol = 6)
-    # ns <- t(apply(ns, 1, function(x) x * (c(pa, (1 - pa), 1, pb, (1 - pb), 1) != 0)))
+
+    ns <- matrix(runif(trial * 6), ncol = 6) # add uniform samples to generate logistic noise
+
+    ### prespecify output data structures
     out <- rep(NA, trial) # simplex probability of choosing option a
-    act_out <- matrix(rep(NA, 4 * trial), ncol = 4)
-    bv_out <- matrix(rep(NA, 2 * trial), ncol = 2)
-    pr_out <- matrix(rep(NA, 4 * trial), ncol = 4)
+    act_out <- matrix(rep(NA, 4 * trial), ncol = 4) # activations
+    bv_out <- matrix(rep(NA, 2 * trial), ncol = 2) # blended values
+    pr_out <- matrix(rep(NA, 4 * trial), ncol = 4) # probability of recovery
     out[1] <- 1 / 2
     for (t in 2:trial) {
-      noise <- ns[t, ]
-      acts <- sapply(1:6, function(x) log(sum((t - mem[[x]]) ^ -decay, na.rm = TRUE))) + sigma * log((1 -  noise) / noise)
-      # acts <- ifelse(acts == Inf, -Inf, acts)
+      # calculate activations (decayed traces plus noise)
+      acts <- sapply(1:6, function(x) log(sum((t - mem[[x]]) ^ -decay, na.rm = TRUE))) + sigma * log((1 -  ns[t, ]) / ns[t, ])
       acts <- ifelse(c(pa, (1 - pa), 1, pb, (1 - pb), 1) == 0, -Inf, acts)
-      act_out[t,] <- acts[c(1:2, 4:5)]
+      act_out[t,] <- acts[c(1:2, 4:5)] # only save non-prepopulated value activations
       
+      # calcluate cognitive probabilities
       ps <- c(exp(acts[1:3] / tau) / sum(exp(acts[1:3] / tau)),  exp(acts[4:6] / tau) / sum(exp(acts[4:6] / tau)))
-      pr_out[t,] <- ps[c(1:2,4:5)]
+      pr_out[t,] <- ps[c(1:2,4:5)] # only save non-prepopulated value probabilities
       
+      # calcluated option-wise blended values
       vals <- c(ps[1:3] %*% c(v_a1, v_a2, pp), ps[4:6] %*% c(v_b1, v_b2, pp))
       bv_out[t,] <- vals
       
-      out[t] <- exp(vals[1]) / sum(exp(vals))
+      out[t] <- exp(vals[1]) / sum(exp(vals)) # simplex preference for A
+
+      # play relevant gamble and record observed outcome into memory
       tmp <- ifelse(
         sample(1:2, 1, prob = exp(exp(vals) / sum(exp(vals)))) == 1, 
         as.character(sample(paste0("1_", c(paste0("1_", v_a1), paste0("2_", v_a2))), 1, prob = c(pa, 1 - pa))), 
@@ -145,6 +152,7 @@ server <- function(input, output) {
   
   values <- reactiveValues(hot = init) # table setup based on initial values at top
   
+  # following chunk handles manual table updating
   output$hot = renderRHandsontable({
     DT = NULL
     if (!is.null(input$hot)) {
@@ -172,6 +180,7 @@ server <- function(input, output) {
       
 })
   
+  # p_dat runs/contains the main simulation data
   p_dat <- reactive({
     input$go
     isolate(port <- values[["hot"]])
@@ -181,6 +190,7 @@ server <- function(input, output) {
     )))
   })
   
+  # plots the probability of choosing A
   p_dat %>% ggvis(~trial, ~out) %>%
     layer_smooths(stroke := "orange", fill := "orange", se = TRUE) %>%
     group_by(trial) %>%
@@ -195,6 +205,7 @@ server <- function(input, output) {
     layer_text(text := ~est) %>%
     bind_shiny("iblPlot")
   
+  # aggregate for blended value plot
   bv_dat <- reactive({
     p_dat() %>%
       dplyr::select(bv_a, bv_b, idx, trial) %>%
@@ -203,6 +214,7 @@ server <- function(input, output) {
       mutate(Option = ifelse(opts == "bv_a", "A", "B"))
   })
   
+  # aggregate for activation plot
   a_dat <- reactive({
     p_dat() %>%
       dplyr::select(idx, aa_1:ab_2, trial) %>%
@@ -212,6 +224,7 @@ server <- function(input, output) {
       mutate(opts = ifelse(opts == "aa_1", "Option A, Outcome 1", ifelse(opts == "aa_2", "Option A, Outcome 2", ifelse(opts == "ab_1", "Option B, Outcome 1", "Option B, Outcome 2"))))
   })
   
+  # aggregate for probability of retrieval plot
   pr_dat <- reactive({
     p_dat() %>%
       dplyr::select(idx, pa_1:pb_2, trial) %>%
@@ -221,29 +234,29 @@ server <- function(input, output) {
       mutate(opts = ifelse(opts == "pa_1", "Option A, Outcome 1", ifelse(opts == "pa_2", "Option A, Outcome 2", ifelse(opts == "pb_1", "Option B, Outcome 1", "Option B, Outcome 2"))))
   })
   
+  # blended value plot
   bv_dat %>% ggvis(~trial, ~bv) %>%
     group_by(Option) %>%
     layer_smooths(stroke = ~Option, se = TRUE) %>%
     group_by(Option, trial) %>%
     summarise(bv = mean(bv)) %>%
     layer_lines() %>%
-    # layer_points(fill = ~Option, opacity := .5) %>%
     add_axis("y", title = "Blended Value") %>%
     add_axis("x", title = "Trial") %>%
     bind_shiny("bvPlot")
   
+  # activation plot
   a_dat %>% ggvis(~trial, ~acts) %>%
     group_by(opts) %>%
     layer_smooths(stroke = ~opts, fill = ~opts, se = TRUE) %>%
-    # layer_points(fill = ~opts, opacity := .5) %>%
     add_axis("y", title = "Activation") %>%
     add_axis("x", title = "Trial") %>%
     bind_shiny("actsPlot")
   
+  # probability of retrieval plot
   pr_dat %>% ggvis(~trial, ~acts) %>%
     group_by(opts) %>%
     layer_smooths(stroke = ~opts, fill = ~opts, se = TRUE) %>%
-    # layer_points(fill = ~opts, opacity := .5) %>%
     add_axis("y", title = "Probability of Retrieval") %>%
     add_axis("x", title = "Trial") %>%
     scale_numeric("y", domain = c(0, 1), nice = TRUE) %>%
