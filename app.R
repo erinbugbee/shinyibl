@@ -6,7 +6,6 @@ library(tidyr)
 library(rhandsontable)
 library(data.table)
 
-
 # Initial values and names for input table
 init <- data.table(V1 = c(0, 10),
                    V2 = c(100, 20),
@@ -75,20 +74,33 @@ ui <- fluidPage(
                   min = 0.1,
                   max = 5,
                   value = 0.5),
-      p(actionButton("go", "Run simulation", icon("random")))
+      p(actionButton("go", "Run simulation", icon("random"))),
+      tags$h5("Select which plots you would like to see:"),
+      checkboxInput('checkp', 'p(A) Plot'),
+      checkboxInput('checkbv', 'Blended Values Plot'),
+      checkboxInput('checkprob', 'Probability of Retrieval Plot'),
+      checkboxInput('checkact', 'Activation Plot')
     ),
     mainTopPanel(
       fluidRow(
-        column(10, ggvisOutput("iblPlot"))
+        column(10, 
+               conditionalPanel(condition = "input.checkp",  
+                                ggvisOutput("iblPlot")))
       ),
       fluidRow(
-        column(10, ggvisOutput("bvPlot"))
+        column(10, 
+               conditionalPanel(condition = "input.checkbv",
+                                ggvisOutput("bvPlot")))
       ),
       fluidRow(
-        column(12, ggvisOutput("probPlot"))
+        column(12, 
+               conditionalPanel(condition = "input.checkprob",
+                                ggvisOutput("probPlot")))
       ),
       fluidRow(
-        column(12, ggvisOutput("actsPlot"))
+        column(12, 
+               conditionalPanel(condition = "input.checkact",
+                                ggvisOutput("actsPlot")))
       )
     )
   )
@@ -96,6 +108,7 @@ ui <- fluidPage(
 
 # Define server
 server <- function(input, output) {
+  v <- reactiveValues(data = NULL)
   # IBL calculation function
   iblCalc <- function(idx, v_a1, v_a2, v_b1, v_b2, pa, pb, decay, trial, sigma, timer) {
     # get IBl predictions for current gamble/participant sampling period
@@ -150,6 +163,7 @@ server <- function(input, output) {
     tmp
   }
   
+
   values <- reactiveValues(hot = init) # table setup based on initial values at top
   
   # following chunk handles manual table updating
@@ -160,25 +174,29 @@ server <- function(input, output) {
       values[["hot"]] = DT
     } else if (!is.null(values[["hot"]])) {
       DT = values[["hot"]]
-    }
-    if (!is.null(DT))
+    } 
+    if (!is.null(DT)){
       names(DT) <- name_in
     DT$p1 <- ifelse(DT$p1 > 1 | DT$p1 < 0, .5, DT$p1)
     DT$p2 <- 1 - DT$p1
     DT$ev <- DT$V1 * DT$p1 + DT$V2 * DT$p2
     names(DT) <- name_out
     rownames(DT) <- rows
+    
+
+    }
+
     rhandsontable(DT) %>%
       hot_col(col = "O1") %>%
       hot_col(col = "O2") %>%
       hot_col(col = "p(O1)") %>%
-      hot_col(col = "p(O2)", readOnly = TRUE) %>%
-      hot_col(col = "EV", readOnly = TRUE, renderer = "function(instance, td, row, col,          prop, value, cellProperties) {
-              Handsontable.TextCell.renderer.apply(this, arguments);
-              td.style.background = 'lightblue';
-  }")
-      
+      hot_col(col = "p(O2)", readOnly = T) %>%
+      hot_col(col = "EV", readOnly = T)
+    
 })
+  
+  ibl <- reactiveValues(plota = NULL)
+  iblreset <- reactiveValues(plota = NULL)
   
   # p_dat runs/contains the main simulation data
   p_dat <- reactive({
@@ -244,7 +262,8 @@ server <- function(input, output) {
     add_axis("y", title = "Blended Value") %>%
     add_axis("x", title = "Trial") %>%
     bind_shiny("bvPlot")
-  
+
+
   # activation plot
   a_dat %>% ggvis(~trial, ~acts) %>%
     group_by(opts) %>%
@@ -252,7 +271,7 @@ server <- function(input, output) {
     add_axis("y", title = "Activation") %>%
     add_axis("x", title = "Trial") %>%
     bind_shiny("actsPlot")
-  
+
   # probability of retrieval plot
   pr_dat %>% ggvis(~trial, ~acts) %>%
     group_by(opts) %>%
