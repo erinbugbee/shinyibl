@@ -126,20 +126,23 @@ server <- function(input, output) {
                       as.character(pp)))
     mem[names(mem) == pp] <- 1
 
-    ns <- matrix(runif((trial+1) * 6), ncol = 6) # add uniform samples to generate logistic noise
-
-    ### prespecify output data structures
+    ns <- matrix(runif((trial+1) * 6, min = 0.1), ncol = 6) # add uniform samples to generate logistic noise
+    
+    ### prespecify output data structure
     out <- rep(NA, trial+1) # simplex probability of choosing option a
-    act_out <- matrix(rep(NA, 4 * (trial+1)), ncol = 4) # activations
+    act_out <- matrix(rep(-10, 4 * (trial+1)), ncol = 4) # activations
     bv_out <- matrix(rep(NA, 2 * (trial+1)), ncol = 2) # blended values
     pr_out <- matrix(rep(NA, 4 * (trial+1)), ncol = 4) # probability of recovery
     out[1] <- 1 / 2
+    act_out[1,] <- -10
     for (t in 2:(trial+1)) {
       # calculate activations (decayed traces plus noise)
-      acts <- sapply(1:6, function(x) log(sum((t - mem[[x]]) ^ -decay, na.rm = TRUE))) + sigma * log((1 -  ns[t, ]) / ns[t, ])
-      acts <- ifelse(c(pa, (1 - pa), 1, pb, (1 - pb), 1) == 0, -Inf, acts)
+      acts <- sapply(1:6, function(x) log(sum((t - mem[[x]]) ^ (-decay), na.rm = TRUE))) + sigma * log((1 -  ns[t, ]) / ns[t, ])
+      #acts <- ifelse(c(pa, (1 - pa), 1, pb, (1 - pb), 1) == 0, -Inf, acts)
+      #acts <- ifelse(c(pa, (1 - pa), 1, pb, (1 - pb), 1) == 0, -10, acts)
+      acts <- ifelse(acts == -Inf, -10, acts)
       act_out[t,] <- acts[c(1:2, 4:5)] # only save non-prepopulated value activations
-      
+      print(act_out[2,])
       # calculate cognitive probabilities
       ps <- c(exp(acts[1:3] / tau) / sum(exp(acts[1:3] / tau)),  exp(acts[4:6] / tau) / sum(exp(acts[4:6] / tau)))
       pr_out[t,] <- ps[c(1:2,4:5)] # only save non-prepopulated value probabilities
@@ -274,7 +277,7 @@ server <- function(input, output) {
   a_dat <- reactive({
     p_dat() %>%
       dplyr::select(idx, aa_1:ab_2, trial) %>%
-      #dplyr::filter(trial > 1) %>%
+      dplyr::filter(trial > 1) %>%
       gather(opts, acts, -trial, -idx) %>%
       filter(acts > -Inf) %>%
       mutate(opts = ifelse(opts == "aa_1", "Option A, Outcome 1", ifelse(opts == "aa_2", "Option A, Outcome 2", ifelse(opts == "ab_1", "Option B, Outcome 1", "Option B, Outcome 2"))))
