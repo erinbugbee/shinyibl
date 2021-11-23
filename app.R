@@ -45,10 +45,10 @@ ui <- fluidPage(
     sidebarBottomPanel(
       h4("Instructions:"),
       tags$h6("This is a GUI to simulate choices from the instance-based learning model. To use it:"),
-      tags$h6("1. Enter the binary choice problem that you want to simulate"),
-      tags$h6("2. Define the simulation parameters"),
-      tags$h6("3. Define the IBL model parameters"),
-      tags$h6("4. Run simulation"),
+      tags$h6("1. Enter the binary choice problem that you want to simulate."),
+      tags$h6("2. Define the simulation parameters."),
+      tags$h6("3. Define the IBL model parameters."),
+      tags$h6("4. Run the simulation."),
       h4("Define gamble values:"),
       rHandsontableOutput("hot"),
       h4("Define simulation settings:"),
@@ -75,6 +75,7 @@ ui <- fluidPage(
                   max = 5,
                   value = 0.5),
       p(actionButton("go", "Run simulation", icon("random"))),
+
       tags$h5("Select which plots you would like to see:"),
       checkboxInput('checkp', 'p(A) Plot'),
       checkboxInput('checkbv', 'Blended Values Plot'),
@@ -82,6 +83,12 @@ ui <- fluidPage(
       checkboxInput('checkact', 'Activation Plot')
     ),
     mainTopPanel(
+      strong(h4("Parameters of the current graphs:")),
+      textOutput("subj_var"),
+      textOutput("trial_var"),
+      textOutput("decay_var"),
+      textOutput("noise_var"),
+
       fluidRow(
         column(10, 
                conditionalPanel(condition = "input.checkp",  
@@ -109,6 +116,7 @@ ui <- fluidPage(
 # Define server
 server <- function(input, output) {
   v <- reactiveValues(data = NULL)
+  
   # IBL calculation function
   iblCalc <- function(idx, v_a1, v_a2, v_b1, v_b2, pa, pb, decay, trial, sigma, timer) {
     # get IBl predictions for current gamble/participant sampling period
@@ -139,10 +147,8 @@ server <- function(input, output) {
       # calculate activations (decayed traces plus noise)
       acts <- sapply(1:6, function(x) log(sum((t - mem[[x]]) ^ (-decay), na.rm = TRUE))) + sigma * log((1 -  ns[t, ]) / ns[t, ])
       #acts <- ifelse(c(pa, (1 - pa), 1, pb, (1 - pb), 1) == 0, -Inf, acts)
-      #acts <- ifelse(c(pa, (1 - pa), 1, pb, (1 - pb), 1) == 0, -10, acts)
       acts <- ifelse(acts == -Inf, -10, acts)
       act_out[t,] <- acts[c(1:2, 4:5)] # only save non-prepopulated value activations
-      print(act_out[2,])
       # calculate cognitive probabilities
       ps <- c(exp(acts[1:3] / tau) / sum(exp(acts[1:3] / tau)),  exp(acts[4:6] / tau) / sum(exp(acts[4:6] / tau)))
       pr_out[t,] <- ps[c(1:2,4:5)] # only save non-prepopulated value probabilities
@@ -168,6 +174,43 @@ server <- function(input, output) {
   
 
   values <- reactiveValues(hot = init) # table setup based on initial values at top
+  
+  # Initialized values for first plot
+  output$subj_var <- renderText({ 
+    isolate(paste("Number of subjects:", input$subj))
+  })
+  
+  output$trial_var <- renderText({ 
+    isolate(paste("Number of trials:", input$trial))
+  })
+  
+  output$decay_var <- renderText({ 
+    isolate(paste("Value of decay parameter:", input$decay))
+  })
+  
+  output$noise_var <- renderText({ 
+    isolate(paste("Value of noise parameter:", input$sigma))
+  })
+
+  # Update values when Run Simulation is clicked
+  observeEvent(input$go, {
+    output$subj_var <- renderText({ 
+      isolate(paste("Number of subjects:", input$subj))
+    })
+    
+    output$trial_var <- renderText({ 
+      isolate(paste("Number of trials:", input$trial))
+    })
+    
+    output$decay_var <- renderText({ 
+      isolate(paste("Value of decay parameter:", input$decay))
+    })
+    
+    output$noise_var <- renderText({ 
+      isolate(paste("Value of noise parameter:", input$sigma))
+    })
+    })
+  
   
   # following chunk handles manual table updating
   output$hot = renderRHandsontable({
@@ -195,7 +238,7 @@ server <- function(input, output) {
       hot_col(col = "p(O2)", readOnly = T) %>%
       hot_col(col = "EV", readOnly = T)
     
-})
+  })
   
   ibl <- reactiveValues(plota = NULL)
   iblreset <- reactiveValues(plota = NULL)
