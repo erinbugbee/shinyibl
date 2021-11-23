@@ -83,9 +83,10 @@ ui <- fluidPage(
       checkboxInput('checkact', 'Activation Plot')
     ),
     mainTopPanel(
-      strong(h4("Parameters of the current graphs:")),
+      strong(h4("Simulation settings of the current graphs:")),
       textOutput("subj_var"),
       textOutput("trial_var"),
+      strong(h4("Model parameters of the current graphs:")),
       textOutput("decay_var"),
       textOutput("noise_var"),
 
