@@ -147,8 +147,8 @@ server <- function(input, output) {
     for (t in 2:(trial+1)) {
       # calculate activations (decayed traces plus noise)
       acts <- sapply(1:6, function(x) log(sum((t - mem[[x]]) ^ (-decay), na.rm = TRUE))) + sigma * log((1 -  ns[t, ]) / ns[t, ])
-      #acts <- ifelse(c(pa, (1 - pa), 1, pb, (1 - pb), 1) == 0, -Inf, acts)
       acts <- ifelse(acts == -Inf, -10, acts)
+     # acts <- ifelse(c(pa, (1 - pa), 1, pb, (1 - pb), 1) == 0, -Inf, acts)
       act_out[t,] <- acts[c(1:2, 4:5)] # only save non-prepopulated value activations
       # calculate cognitive probabilities
       ps <- c(exp(acts[1:3] / tau) / sum(exp(acts[1:3] / tau)),  exp(acts[4:6] / tau) / sum(exp(acts[4:6] / tau)))
@@ -157,8 +157,9 @@ server <- function(input, output) {
       # calculate option-wise blended values
       vals <- c(ps[1:3] %*% c(v_a1, v_a2, pp), ps[4:6] %*% c(v_b1, v_b2, pp))
       bv_out[t,] <- vals
-      
-      out[t] <- exp(vals[1]) / sum(exp(vals)) # simplex preference for A
+
+      out[t] <- mean(vals[1] > vals[2]) # Calculate P(A) as proportion when BV of A > BV of B
+
   
       # play relevant gamble and record observed outcome into memory
       tmp <- ifelse(
@@ -280,7 +281,7 @@ server <- function(input, output) {
       gather(opts, bv, -trial, -idx) %>%
       mutate(Option = ifelse(opts == "bv_a", "A", "B"))
   })
-  
+
   # blended value plot
   bv_dat %>% ggvis(~trial-1, ~bv) %>%
     group_by(Option) %>%
