@@ -17,6 +17,7 @@ name_out <- c("O1", "O2", "p(O1)", "p(O2)", "EV")
 name_in <- c("V1", "V2", "p1", "p2", "ev")
 rownames(init) <- rows
 
+
 # Define UI
 ui <- fluidPage(
   titlePanel("Shiny IBL"),
@@ -160,7 +161,6 @@ server <- function(input, output) {
 
       out[t] <- mean(vals[1] > vals[2]) # Calculate P(A) as proportion when BV of A > BV of B
 
-  
       # play relevant gamble and record observed outcome into memory
       tmp <- ifelse(
         sample(1:2, 1, prob = exp(exp(vals) / sum(exp(vals)))) == 1, 
@@ -169,8 +169,8 @@ server <- function(input, output) {
       )
       mem[names(mem) == tmp][[1]] <- c(mem[names(mem) == tmp][[1]], t)
     }
-    tmp <- data.frame(cbind(idx, out, act_out, bv_out, 1:(trial+1), pr_out, max(trial)))
-    names(tmp) <- c("idx", "out", "aa_1", "aa_2", "ab_1", "ab_2", "bv_a", "bv_b", "trial", "pa_1", "pa_2", "pb_1", "pb_2", "maxTrial")
+    tmp <- data.frame(cbind(idx, out, v_a1, v_a2, v_b1, v_b2, pa, pb, act_out, bv_out, 1:(trial+1), pr_out, max(trial)))
+    names(tmp) <- c("idx", "out", "v_a1", "v_a2", "v_b1", "v_b2", "pa", "pb", "aa_1", "aa_2", "ab_1", "ab_2", "bv_a", "bv_b", "trial", "pa_1", "pa_2", "pb_1", "pb_2", "maxTrial")
     tmp
   }
   
@@ -193,7 +193,7 @@ server <- function(input, output) {
   output$noise_var <- renderText({ 
     isolate(paste("Value of noise parameter:", input$sigma))
   })
-
+  
   # Update values when Run Simulation is clicked
   observeEvent(input$go, {
     output$subj_var <- renderText({ 
@@ -211,6 +211,7 @@ server <- function(input, output) {
     output$noise_var <- renderText({ 
       isolate(paste("Value of noise parameter:", input$sigma))
     })
+    
     })
   
   
@@ -254,7 +255,7 @@ server <- function(input, output) {
     isolate(do.call("rbind", lapply(1:input$subj, iblCalc, port$V1[1], port$V2[1], port$V1[2], port$V2[2], port$p1[1], port$p1[2], input$decay, input$trial, input$sigma, input$subj
     )))
   })
-
+  
   # plots the probability of choosing A
   p_dat %>% ggvis(~trial-1, ~out) %>%
     dplyr::filter(trial > 1) %>%
@@ -297,42 +298,40 @@ server <- function(input, output) {
   # aggregate for probability of retrieval plot
   pr_dat <- reactive({
     p_dat() %>%
-      dplyr::select(idx, pa_1:pb_2, trial) %>%
+      dplyr::select(idx, pa_1:pb_2, trial, v_a1, v_a2, v_b1, v_b2, pa, pb) %>%
       dplyr::filter(trial > 1) %>%
-      gather(opts, acts, -trial, -idx) %>%
+      gather(opts, acts, -trial, -idx, -v_a1, -v_a2, -v_b1, -v_b2, -pa, -pb) %>%
       filter(acts > -Inf) %>%
-      mutate(opts = ifelse(opts == "pa_1", "Option A, Outcome 1", ifelse(opts == "pa_2", "Option A, Outcome 2", ifelse(opts == "pb_1", "Option B, Outcome 1", "Option B, Outcome 2"))))
+      mutate(opts = ifelse(opts == "pa_1", paste("Option A, Outcome: ", v_a1, ", Probability: ", pa, sep = ""), ifelse(opts == "pa_2", paste("Option A, Outcome: ", v_a2, ", Probability: ", 1-pa, sep = ""), ifelse(opts == "pb_1", paste("Option B, Outcome: ", v_b1, ", Probability: ", pb, sep = ""), paste("Option B, Outcome: ", v_b2, ", Probability: ", 1-pb, sep = "")))))
   })
 
   # probability of retrieval plot
   pr_dat %>% ggvis(~trial-1, ~acts) %>%
     group_by(opts) %>%
-    layer_points(opacity := 0.2, fill = ~opts) %>%
-    #layer_smooths(stroke = ~opts, fill = ~opts, se = TRUE) %>%
+    layer_points(opacity := 0.2, fill = ~opts, stroke = ~opts) %>%
     group_by(opts, trial) %>%
     summarise(acts = mean(acts)) %>%
     layer_paths(stroke = ~opts, strokeWidth := 3) %>%
     add_axis("y", title = "Probability of Retrieval") %>%
     add_axis("x", title = "Trial") %>%
     scale_numeric("y", domain = c(0, 1), nice = TRUE) %>%
-    add_legend(c("stroke", "fill"), title = "Option and Outcome") %>%
+    add_legend(c("fill", "stroke"), title = "Option and Outcome") %>%
     bind_shiny("probPlot")
   
   # aggregate for activation plot
   a_dat <- reactive({
     p_dat() %>%
-      dplyr::select(idx, aa_1:ab_2, trial) %>%
+      dplyr::select(idx, aa_1:ab_2, trial, v_a1, v_a2, v_b1, v_b2, pa, pb) %>%
       dplyr::filter(trial > 1) %>%
-      gather(opts, acts, -trial, -idx) %>%
+      gather(opts, acts, -trial, -idx, -v_a1, -v_a2, -v_b1, -v_b2, -pa, -pb) %>%
       filter(acts > -Inf) %>%
-      mutate(opts = ifelse(opts == "aa_1", "Option A, Outcome 1", ifelse(opts == "aa_2", "Option A, Outcome 2", ifelse(opts == "ab_1", "Option B, Outcome 1", "Option B, Outcome 2"))))
-  })
+      mutate(opts = ifelse(opts == "aa_1", paste("Option A, Outcome: ", v_a1, ", Probability: ", pa, sep = ""), ifelse(opts == "aa_2", paste("Option A, Outcome: ", v_a2, ", Probability: ", 1-pa, sep = ""), ifelse(opts == "ab_1", paste("Option B, Outcome: ", v_b1, ", Probability: ", pb, sep = ""), paste("Option B, Outcome: ", v_b2, ", Probability: ", 1-pb, sep = "")))))
+    })
   
     # activation plot
   a_dat %>% ggvis(~trial-1, ~acts) %>%
     group_by(opts) %>%
-    layer_points(opacity := 0.2, fill = ~opts) %>%
-    #layer_smooths(stroke = ~opts, fill = ~opts, se = TRUE) %>%
+    layer_points(opacity := 0.2, fill = ~opts, stroke = ~opts) %>%
     group_by(opts, trial) %>%
     summarise(acts = mean(acts)) %>%
     layer_paths(stroke = ~opts, strokeWidth := 3) %>%
