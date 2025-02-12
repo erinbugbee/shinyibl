@@ -61,7 +61,7 @@ ui <- fluidPage(
 
       tags$h6("3. Define the IBL model parameters."),
       tags$h6("4. Run the simulation."),
-      h4("Define gamble values:"),
+      h4("Define Gamble Values:"),
       rHandsontableOutput("hot"),
       h4("Define Simulation Settings:"),
       sliderInput("subj",
@@ -384,7 +384,7 @@ server <- function(input, output) {
       geom_line(data = avg_data, aes(x = trial - 1, y = acts, color = opts),
                 linewidth = 1) +  
       
-      labs(x = "Trial", y = "Probability of Retrieval", title = "Probability of Retrieval", color = "Option") +
+      labs(x = "Trial", y = "Probability of Retrieval", title = "Probability of Retrieval", color = "Option and Outcome/Probability") +
       scale_color_manual(values = c("#1b9e77", "#d95f02", "#7570b3", "#e7298a")) +  
       theme_minimal(base_size = 16) +
       theme(
@@ -432,7 +432,7 @@ server <- function(input, output) {
       geom_line(data = avg_data, aes(x = trial - 1, y = acts, color = opts),
                 size = 1) +  
       
-      labs(x = "Trial", y = "Activation", title = "Activation", color = "Option") +
+      labs(x = "Trial", y = "Activation", title = "Activation", color = "Option and Outcome/Probability") +
       scale_color_manual(values = c("#1b9e77", "#d95f02", "#7570b3", "#e7298a")) +  
       theme_minimal(base_size = 16) +
       theme(
