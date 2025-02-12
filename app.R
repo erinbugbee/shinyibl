@@ -15,6 +15,8 @@ library(reshape2)
 library(tidyr)
 library(rhandsontable)
 library(data.table)
+library(shinylive)
+library(ggplot2)
 
 # Initial values and names for input table
 init <- data.table(V1 = c(0, 10),
@@ -31,7 +33,7 @@ rownames(init) <- rows
 # Define UI
 ui <- fluidPage(
   titlePanel("Shiny IBL"),
-  # following fluidRow imlements the loading message while simulation is running
+  # following fluidRow implements the loading message while simulation is running
   fluidRow(
     tags$style(type="text/css", "
                #loadmessage {
@@ -48,78 +50,75 @@ ui <- fluidPage(
                z-index: 105;
                }
                "),
-    conditionalPanel(condition="$('html').hasClass('shiny-busy')",
-                     tags$div("Loading...",id="loadmessage")
-    )
     ),
-  sidebarBottomPage(
-    sidebarBottomPanel(
+  sidebarLayout(
+    sidebarPanel(
+      width = 4,
       h4("Instructions:"),
       tags$h6("This is a GUI to simulate choices from the instance-based learning model. To use it:"),
       tags$h6("1. Enter the binary choice problem that you want to simulate."),
-      tags$h6("2. Define the simulation parameters."),
+      tags$h6("2. Define the simulation settings"),
+
       tags$h6("3. Define the IBL model parameters."),
       tags$h6("4. Run the simulation."),
       h4("Define gamble values:"),
       rHandsontableOutput("hot"),
-      h4("Define simulation settings:"),
+      h4("Define Simulation Settings:"),
       sliderInput("subj",
-                  "Number of subjects:",
+                  "Number of Subjects:",
                   min = 1,
                   max = 200,
                   value = 10),
       sliderInput("trial",
-                  "Number of trials:",
+                  "Number of Trials:",
                   min = 5,
                   max = 300,
                   value = 20),
-      h4("Define model parameters:"),
+      h4("Define Model Parameters:"),
       sliderInput("decay",
-                  "Value of decay parameter:",
+                  "Value of Decay Parameter:",
                   min = -5,
                   max = 5,
                   value = 0.75,
                   step = .25),
       sliderInput("sigma",
-                  "Value of noise parameter:",
+                  "Value of Noise Parameter:",
                   min = 0.1,
                   max = 5,
                   value = 0.5),
-      p(actionButton("go", "Run simulation", icon("random"))),
+      p(actionButton("go", "Run Simulation", icon("play"))),
 
-      tags$h5("Select which plots you would like to see:"),
-      checkboxInput('checkp', 'p(A) Plot'),
-      checkboxInput('checkbv', 'Blended Values Plot'),
-      checkboxInput('checkprob', 'Probability of Retrieval Plot'),
-      checkboxInput('checkact', 'Activation Plot')
+     # tags$h5("Select which plots you would like to see:"),
+    #  checkboxInput('checkp', 'p(A) Plot'),
+    #  checkboxInput('checkbv', 'Blended Values Plot'),
+    #  checkboxInput('checkprob', 'Probability of Retrieval Plot'),
+    #  checkboxInput('checkact', 'Activation Plot')
     ),
-    mainTopPanel(
-      strong(h4("Simulation settings of the current graphs:")),
-      textOutput("subj_var"),
-      textOutput("trial_var"),
-      strong(h4("Model parameters of the current graphs:")),
-      textOutput("decay_var"),
-      textOutput("noise_var"),
-
+    mainPanel(
       fluidRow(
-        column(10, 
-               conditionalPanel(condition = "input.checkp",  
-                                ggvisOutput("iblPlot")))
+        column(6,
+               tags$div(style = "border: 2px solid #ddd; padding: 15px; border-radius: 10px; background-color: #f9f9f9; margin-bottom: 20px;",
+                        tags$h4("Simulation Settings", style = "font-weight: bold; color: #333;"),
+                        tags$p("Number of Subjects: ", strong(textOutput("subj_var", inline = TRUE))),
+                        tags$p("Number of Trials: ", strong(textOutput("trial_var", inline = TRUE)))
+               )
+        ),
+        column(6,
+               tags$div(style = "border: 2px solid #ddd; padding: 15px; border-radius: 10px; background-color: #f9f9f9; margin-bottom: 20px;",
+                        tags$h4("Model Parameters", style = "font-weight: bold; color: #333;"),
+                        tags$p("Decay Parameter: ", strong(textOutput("decay_var", inline = TRUE))),
+                        tags$p("Noise Parameter: ", strong(textOutput("noise_var", inline = TRUE)))
+               )
+        )
+      ),
+      
+      fluidRow(
+        column(6, plotOutput("iblPlot")),
+        column(6, plotOutput("bvPlot"))
       ),
       fluidRow(
-        column(10, 
-               conditionalPanel(condition = "input.checkbv",
-                                ggvisOutput("bvPlot")))
-      ),
-      fluidRow(
-        column(12, 
-               conditionalPanel(condition = "input.checkprob",
-                                ggvisOutput("probPlot")))
-      ),
-      fluidRow(
-        column(12, 
-               conditionalPanel(condition = "input.checkact",
-                                ggvisOutput("actsPlot")))
+        column(6, plotOutput("probPlot")),
+        column(6, plotOutput("actsPlot"))
       )
     )
   )
@@ -171,9 +170,18 @@ server <- function(input, output) {
 
       out[t] <- mean(vals[1] > vals[2]) # Calculate P(A) as proportion when BV of A > BV of B
 
+      # Fixes error with NAs
+      safe_softmax <- function(x) {
+        x <- x - max(x, na.rm = TRUE)  # Normalize for numerical stability
+        exp_x <- exp(x)
+        exp_x / sum(exp_x, na.rm = TRUE)
+      }
+      
+      probs <- safe_softmax(vals)
+      
       # play relevant gamble and record observed outcome into memory
       tmp <- ifelse(
-        sample(1:2, 1, prob = exp(exp(vals) / sum(exp(vals)))) == 1, 
+        sample(1:2, 1, prob = probs) == 1, 
         as.character(sample(paste0("1_", c(paste0("1_", v_a1), paste0("2_", v_a2))), 1, prob = c(pa, 1 - pa))), 
         as.character(sample(paste0("2_", c(paste0("1_", v_b1), paste0("2_", v_b2))), 1, prob = c(pb, 1 - pb)))
       )
@@ -189,37 +197,37 @@ server <- function(input, output) {
   
   # Initialized values for first plot
   output$subj_var <- renderText({ 
-    isolate(paste("Number of subjects:", input$subj))
+    isolate(input$subj)
   })
   
   output$trial_var <- renderText({ 
-    isolate(paste("Number of trials:", input$trial))
+    isolate(input$trial)
   })
   
   output$decay_var <- renderText({ 
-    isolate(paste("Value of decay parameter:", input$decay))
+    isolate(input$decay)
   })
   
   output$noise_var <- renderText({ 
-    isolate(paste("Value of noise parameter:", input$sigma))
+    isolate(input$sigma)
   })
   
   # Update values when Run Simulation is clicked
   observeEvent(input$go, {
     output$subj_var <- renderText({ 
-      isolate(paste("Number of subjects:", input$subj))
+      isolate(input$subj)
     })
     
     output$trial_var <- renderText({ 
-      isolate(paste("Number of trials:", input$trial))
+      isolate(input$trial)
     })
     
     output$decay_var <- renderText({ 
-      isolate(paste("Value of decay parameter:", input$decay))
+      isolate(input$decay)
     })
     
     output$noise_var <- renderText({ 
-      isolate(paste("Value of noise parameter:", input$sigma))
+      isolate(input$sigma)
     })
     
     })
@@ -256,7 +264,7 @@ server <- function(input, output) {
   ibl <- reactiveValues(plota = NULL)
   iblreset <- reactiveValues(plota = NULL)
 
-  # p_dat runs/contains the main simulation data
+  # p_dat contains the main simulation data
   p_dat <- reactive({
     input$go
     isolate(port <- values[["hot"]])
@@ -266,89 +274,179 @@ server <- function(input, output) {
     )))
   })
   
-  # plots the probability of choosing A
-  p_dat %>% ggvis(~trial-1, ~out) %>%
-    dplyr::filter(trial > 1) %>%
-    layer_points(opacity := 0.2, fill := "#1776b6") %>%
-    #layer_smooths(stroke := "#1776b6", fill := "#1776b6", se = TRUE) %>%
-    group_by(trial) %>%
-    summarise(out = mean(out)) %>%
-    layer_paths(stroke := "#1776b6", strokeWidth := 3) %>%
-    add_axis("y", title = "p(A)") %>%
-    add_axis("x", title = "Trial") %>%
-    scale_numeric("y", domain = c(0, 1), nice = TRUE) %>%
-    summarise(est   = paste("p(A) =", round(mean(out), 2)),
-              trial = max(trial)) %>%
-    mutate(out = 0.5) %>%
-    layer_text(text := ~est, fontSize := 20, align := "right") %>%
-    hide_legend(scales = c("stroke", "fill")) %>%
-    bind_shiny("iblPlot")
+  # Probability of Choosing Option Plot
+  output$iblPlot <- renderPlot({
+    raw_data <- p_dat() %>%
+      dplyr::filter(trial > 1) %>%
+      mutate(pB = 1 - out) %>%  # Compute p(B)
+      pivot_longer(cols = c(out, pB), names_to = "Option", values_to = "Probability") %>%
+      mutate(Option = recode(Option, "out" = "A", "pB" = "B"))  # Rename legend labels
+    
+    avg_data <- raw_data %>%
+      group_by(Option, trial) %>%
+      summarise(Probability = mean(Probability), .groups = "drop")  # Compute averages
+    
+    ggplot() +
+      geom_point(data = raw_data, aes(x = trial - 1, y = Probability, color = Option),
+                 alpha = 0.1, size = 2) +  
+      
+      geom_line(data = avg_data, aes(x = trial - 1, y = Probability, color = Option),
+                linewidth = 1) +  
+      
+      ylim(0, 1) +
+      labs(x = "Trial", y = "Probability", title = "Probability of Choice", color = "Option") +  
+      theme_minimal(base_size = 16) +
+      theme(
+        legend.position = "bottom",
+        legend.direction = "vertical",
+        legend.justification = "left",
+        axis.title.x = element_text(size = 18, face = "bold"),
+        axis.title.y = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 14),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 16, face = "bold")
+      ) +
+      annotate("text", x = max(raw_data$trial) - 2, y = 0.75, 
+               label = paste0("p(A): ", sprintf("%.2f", mean(raw_data$Probability[raw_data$Option == 'A'])), 
+                              "\n p(B): ", sprintf("%.2f", mean(raw_data$Probability[raw_data$Option == 'B']))),
+               hjust = 1, vjust = 1, size = 6, color = "black", fontface = "bold")
+  })
+  
 
-  # aggregate for blended value plot
+  # Aggregate data for Blended Value Plot
   bv_dat <- reactive({
     p_dat() %>%
       dplyr::select(bv_a, bv_b, idx, trial) %>%
       dplyr::filter(trial > 1) %>%
-      gather(opts, bv, -trial, -idx) %>%
-      mutate(Option = ifelse(opts == "bv_a", "A", "B"))
+      pivot_longer(cols = c("bv_a", "bv_b"), names_to = "Option", values_to = "bv") %>%
+      mutate(Option = ifelse(Option == "bv_a", "A", "B"))
   })
-
-  # blended value plot
-  bv_dat %>% ggvis(~trial-1, ~bv) %>%
-    group_by(Option) %>%
-    layer_points(opacity := 0.2, fill = ~Option) %>%
-    #layer_smooths(stroke = ~Option, fill = ~Option, se = TRUE) %>%
-    group_by(Option, trial) %>%
-    summarise(bv = mean(bv)) %>%
-    layer_paths(stroke = ~Option, strokeWidth := 3) %>%
-    add_axis("y", title = "Blended Value") %>%
-    add_axis("x", title = "Trial") %>%
-    bind_shiny("bvPlot")
   
-  # aggregate for probability of retrieval plot
+  # Blended Value Plot
+  output$bvPlot <- renderPlot({
+    raw_data <- bv_dat()
+    
+    avg_data <- raw_data %>%
+      group_by(Option, trial) %>%
+      summarise(bv = mean(bv), .groups = "drop")
+    
+    ggplot() +
+      geom_point(data = raw_data, aes(x = trial - 1, y = bv, color = Option),
+                 alpha = 0.1, size = 2) +  
+      
+      geom_line(data = avg_data, aes(x = trial - 1, y = bv, color = Option),
+                linewidth = 1) +  
+      
+      labs(x = "Trial", y = "Blended Value", title = "Blended Values") +
+      theme_minimal(base_size = 16) +
+      theme(
+        legend.position = "bottom",
+        legend.direction = "vertical",
+        legend.justification = "left",
+        axis.title.x = element_text(size = 18, face = "bold"),
+        axis.title.y = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 14),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 16, face = "bold")
+      )
+  })
+  
+  
+  # Aggregate data for Probability of Retrieval Plot
   pr_dat <- reactive({
     p_dat() %>%
       dplyr::select(idx, pa_1:pb_2, trial, v_a1, v_a2, v_b1, v_b2, pa, pb) %>%
       dplyr::filter(trial > 1) %>%
-      gather(opts, acts, -trial, -idx, -v_a1, -v_a2, -v_b1, -v_b2, -pa, -pb) %>%
+      pivot_longer(cols = c(pa_1, pa_2, pb_1, pb_2), names_to = "opts", values_to = "acts") %>%
       filter(acts > -Inf) %>%
-      mutate(opts = ifelse(opts == "pa_1", paste("Option A, Outcome: ", v_a1, ", Probability: ", pa, sep = ""), ifelse(opts == "pa_2", paste("Option A, Outcome: ", v_a2, ", Probability: ", 1-pa, sep = ""), ifelse(opts == "pb_1", paste("Option B, Outcome: ", v_b1, ", Probability: ", pb, sep = ""), paste("Option B, Outcome: ", v_b2, ", Probability: ", 1-pb, sep = "")))))
+      mutate(opts = case_when(
+        opts == "pa_1" ~ paste("Option A, Outcome: ", v_a1, ", Probability: ", pa, sep = ""),
+        opts == "pa_2" ~ paste("Option A, Outcome: ", v_a2, ", Probability: ", 1 - pa, sep = ""),
+        opts == "pb_1" ~ paste("Option B, Outcome: ", v_b1, ", Probability: ", pb, sep = ""),
+        opts == "pb_2" ~ paste("Option B, Outcome: ", v_b2, ", Probability: ", 1 - pb, sep = "")
+      ))
   })
-
-  # probability of retrieval plot
-  pr_dat %>% ggvis(~trial-1, ~acts) %>%
-    group_by(opts) %>%
-    layer_points(opacity := 0.2, fill = ~opts, stroke = ~opts) %>%
-    group_by(opts, trial) %>%
-    summarise(acts = mean(acts)) %>%
-    layer_paths(stroke = ~opts, strokeWidth := 3) %>%
-    add_axis("y", title = "Probability of Retrieval") %>%
-    add_axis("x", title = "Trial") %>%
-    scale_numeric("y", domain = c(0, 1), nice = TRUE) %>%
-    add_legend(c("fill", "stroke"), title = "Option and Outcome") %>%
-    bind_shiny("probPlot")
   
-  # aggregate for activation plot
+  # Probability of Retrieval Plot
+  output$probPlot <- renderPlot({
+    raw_data <- pr_dat()
+    
+    avg_data <- raw_data %>%
+      group_by(opts, trial) %>%
+      summarise(acts = mean(acts), .groups = "drop")  # Compute averages
+    
+    ggplot() +
+      geom_point(data = raw_data, aes(x = trial - 1, y = acts, color = opts),
+                 alpha = 0.1, size = 2) +  
+      
+      geom_line(data = avg_data, aes(x = trial - 1, y = acts, color = opts),
+                linewidth = 1) +  
+      
+      labs(x = "Trial", y = "Probability of Retrieval", title = "Probability of Retrieval", color = "Option") +
+      scale_color_manual(values = c("#1b9e77", "#d95f02", "#7570b3", "#e7298a")) +  
+      theme_minimal(base_size = 16) +
+      theme(
+        legend.position = "bottom",
+        legend.direction = "vertical",
+        legend.justification = "left",
+        axis.title.x = element_text(size = 18, face = "bold"),
+        axis.title.y = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 14),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 16, face = "bold")
+      )
+  })
+  
+  
+  # Aggregate data for Activation Plot
   a_dat <- reactive({
     p_dat() %>%
       dplyr::select(idx, aa_1:ab_2, trial, v_a1, v_a2, v_b1, v_b2, pa, pb) %>%
       dplyr::filter(trial > 1) %>%
-      gather(opts, acts, -trial, -idx, -v_a1, -v_a2, -v_b1, -v_b2, -pa, -pb) %>%
+      pivot_longer(cols = c(aa_1, aa_2, ab_1, ab_2), names_to = "opts", values_to = "acts") %>%
       filter(acts > -Inf) %>%
-      mutate(opts = ifelse(opts == "aa_1", paste("Option A, Outcome: ", v_a1, ", Probability: ", pa, sep = ""), ifelse(opts == "aa_2", paste("Option A, Outcome: ", v_a2, ", Probability: ", 1-pa, sep = ""), ifelse(opts == "ab_1", paste("Option B, Outcome: ", v_b1, ", Probability: ", pb, sep = ""), paste("Option B, Outcome: ", v_b2, ", Probability: ", 1-pb, sep = "")))))
-    })
+      mutate(opts = case_when(
+        opts == "aa_1" ~ paste("Option A, Outcome: ", v_a1, ", Probability: ", pa, sep = ""),
+        opts == "aa_2" ~ paste("Option A, Outcome: ", v_a2, ", Probability: ", 1 - pa, sep = ""),
+        opts == "ab_1" ~ paste("Option B, Outcome: ", v_b1, ", Probability: ", pb, sep = ""),
+        opts == "ab_2" ~ paste("Option B, Outcome: ", v_b2, ", Probability: ", 1 - pb, sep = "")
+      ))
+  })
   
-    # activation plot
-  a_dat %>% ggvis(~trial-1, ~acts) %>%
-    group_by(opts) %>%
-    layer_points(opacity := 0.2, fill = ~opts, stroke = ~opts) %>%
-    group_by(opts, trial) %>%
-    summarise(acts = mean(acts)) %>%
-    layer_paths(stroke = ~opts, strokeWidth := 3) %>%
-    add_axis("y", title = "Activation") %>%
-    add_axis("x", title = "Trial") %>%
-    add_legend(c("stroke", "fill"), title = "Option and Outcome") %>%
-    bind_shiny("actsPlot")
+  
+    # Activation Plot
+  output$actsPlot <- renderPlot({
+    raw_data <- a_dat()  # Get raw data (all points)
+    
+    avg_data <- raw_data %>%
+      group_by(opts, trial) %>%
+      summarise(acts = mean(acts), .groups = "drop")  # Compute averages
+    
+    ggplot() +
+      geom_point(data = raw_data, aes(x = trial - 1, y = acts, color = opts),
+                 alpha = 0.1, size = 2) +  
+      
+      geom_line(data = avg_data, aes(x = trial - 1, y = acts, color = opts),
+                size = 1) +  
+      
+      labs(x = "Trial", y = "Activation", title = "Activation", color = "Option") +
+      scale_color_manual(values = c("#1b9e77", "#d95f02", "#7570b3", "#e7298a")) +  
+      theme_minimal(base_size = 16) +
+      theme(
+        legend.position = "bottom",
+        legend.direction = "vertical",
+        legend.justification = "left",
+        axis.title.x = element_text(size = 18, face = "bold"),
+        axis.title.y = element_text(size = 18, face = "bold"),
+        axis.text = element_text(size = 14),
+        plot.title = element_text(size = 20, face = "bold", hjust = 0.5),
+        legend.text = element_text(size = 14),
+        legend.title = element_text(size = 16, face = "bold")
+      )
+  })
 }
 
 # Run the application 

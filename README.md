@@ -16,12 +16,15 @@ It is important to install R first, then RStudio.
 
 ### Run App
 
-- After installing both R and RStudio, open the RStudio program.
-- Download the code for this repository by clicking "Code" and downloading as a ZIP. Alternatively, you can clone the repository if you are comfortable with GitHub.
-- Unzip the folder. You will now work with the unzipped folder.
-- Open RStudio. 
-- Set the working directory to be the unzipped folder. There are two main ways to do this. 
-1. Run the following in the console, substituting YOURFILEPATHHERE with the file path to the folder. Make sure to include the quotation marks, and also note that R uses forward slashes (/) as opposed to back slashes (\).
+1. After installing both R and RStudio, open the RStudio program.
+2. Download the code for this repository by clicking "Code" and downloading as a ZIP. Alternatively, you can clone the repository if you are comfortable with GitHub.
+3. Unzip the folder. You will now work with the unzipped folder.
+4. Open RStudio. 
+5. To open the app and run it, there are two options. 
+
+- Option 1 (Recommended): Create a new project by clicking "File" -> "New Project" -> "Existing Directory" and selecting the unzipped folder. This will set the working directory to the unzipped folder.
+- Option 2: Set the working directory to be the unzipped folder. There are two main ways to do this. 
+    -  Run the following in the console, substituting YOURFILEPATHHERE with the file path to the folder. Make sure to include the quotation marks, and also note that R uses forward slashes (/) as opposed to back slashes (\).
 ```
 setwd("YOURFILEPATHHERE")
 ```
@@ -29,14 +32,12 @@ If you saved the folder to your downloads folder, for example, you would use som
 ```
 setwd("/Users/YOURUSERNAME/Downloads/shinyIBL-main")
 ```
-2. Or, navigate to the folder using the bottom right panel of RStudio by clicking through the "Files" tab. Then, click "More" and then "Set As Working Directory".
-
-You can check the current working directory by running the following in the console:
+    - Or, navigate to the folder using the bottom right panel of RStudio by clicking through the "Files" tab. Then, click "More" and then "Set As Working Directory". You can check the current working directory by running the following in the console:
 ```
 getwd()
 ```
-- Once you have set the working directory, open the app.R file in RStudio.
-- Run the following in the console and follow the instructions to install the necessary packages:
+6. Once you have created a project or set the working directory, open the app.R file in RStudio.
+7. Run the following in the console and follow the instructions to install the necessary packages:
 ```
 install.packages("shiny")
 install.packages("ggvis")
@@ -46,6 +47,6 @@ install.packages("tidyr")
 install.packages("rhandsontable")
 install.packages("data.table")
 ```
-- Type shiny::runApp() in the console or click the "Run" button on the upper right. The app should run locally.
+8. Type `shiny::runApp()` in the console or click the "Run" button on the upper right. The app should run locally.
 
 Email Erin Bugbee (ebugbee@andrew.cmu.edu) with any questions about the app.
