@@ -1,4 +1,4 @@
-# Install Packages
+# Install Packages (Run these lines in this console once, removing the #)
 #install.packages("shiny")
 #install.packages("ggvis")
 #install.packages("dplyr")
