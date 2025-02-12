@@ -6,6 +6,7 @@
 #install.packages("tidyr")
 #install.packages("rhandsontable")
 #install.packages("data.table")
+install.packages("ggplot2")
 
 # Load Packages
 library(shiny)
@@ -15,7 +16,6 @@ library(reshape2)
 library(tidyr)
 library(rhandsontable)
 library(data.table)
-library(shinylive)
 library(ggplot2)
 
 # Initial values and names for input table
