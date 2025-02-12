@@ -32,7 +32,7 @@ rownames(init) <- rows
 
 # Define UI
 ui <- fluidPage(
-  titlePanel("Shiny IBL"),
+  titlePanel("ShinyIBL"),
   # following fluidRow implements the loading message while simulation is running
   fluidRow(
     tags$style(type="text/css", "
