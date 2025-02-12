@@ -6,7 +6,6 @@
 #install.packages("tidyr")
 #install.packages("rhandsontable")
 #install.packages("data.table")
-#install.packages("shinylive")
 
 # Load Packages
 library(shiny)
@@ -58,35 +57,35 @@ ui <- fluidPage(
       h4("Instructions:"),
       tags$h6("This is a GUI to simulate choices from the instance-based learning model. To use it:"),
       tags$h6("1. Enter the binary choice problem that you want to simulate."),
-      tags$h6("2. Define the simulation parameters."),
+      tags$h6("2. Define the simulation settings"),
       tags$h6("3. Define the IBL model parameters."),
       tags$h6("4. Run the simulation."),
       h4("Define gamble values:"),
       rHandsontableOutput("hot"),
-      h4("Define simulation settings:"),
+      h4("Define Simulation Settings:"),
       sliderInput("subj",
-                  "Number of subjects:",
+                  "Number of Subjects:",
                   min = 1,
                   max = 200,
                   value = 10),
       sliderInput("trial",
-                  "Number of trials:",
+                  "Number of Trials:",
                   min = 5,
                   max = 300,
                   value = 20),
-      h4("Define model parameters:"),
+      h4("Define Model Parameters:"),
       sliderInput("decay",
-                  "Value of decay parameter:",
+                  "Value of Decay Parameter:",
                   min = -5,
                   max = 5,
                   value = 0.75,
                   step = .25),
       sliderInput("sigma",
-                  "Value of noise parameter:",
+                  "Value of Noise Parameter:",
                   min = 0.1,
                   max = 5,
                   value = 0.5),
-      p(actionButton("go", "Run simulation", icon("random"))),
+      p(actionButton("go", "Run Simulation", icon("play"))),
 
      # tags$h5("Select which plots you would like to see:"),
     #  checkboxInput('checkp', 'p(A) Plot'),
@@ -163,7 +162,6 @@ server <- function(input, output) {
       act_out[t,] <- acts[c(1:2, 4:5)] # only save non-prepopulated value activations
       # calculate cognitive probabilities
       ps <- c(exp(acts[1:3] / tau) / sum(exp(acts[1:3] / tau)),  exp(acts[4:6] / tau) / sum(exp(acts[4:6] / tau)))
-      print(ps)
       pr_out[t,] <- ps[c(1:2,4:5)] # only save non-prepopulated value probabilities
       
       # calculate option-wise blended values
@@ -217,19 +215,19 @@ server <- function(input, output) {
   # Update values when Run Simulation is clicked
   observeEvent(input$go, {
     output$subj_var <- renderText({ 
-      isolate(paste("Number of subjects:", input$subj))
+      isolate(input$subj)
     })
     
     output$trial_var <- renderText({ 
-      isolate(paste("Number of trials:", input$trial))
+      isolate(input$trial)
     })
     
     output$decay_var <- renderText({ 
-      isolate(paste("Value of decay parameter:", input$decay))
+      isolate(input$decay)
     })
     
     output$noise_var <- renderText({ 
-      isolate(paste("Value of noise parameter:", input$sigma))
+      isolate(input$sigma)
     })
     
     })
@@ -309,7 +307,7 @@ server <- function(input, output) {
         legend.text = element_text(size = 14),
         legend.title = element_text(size = 16, face = "bold")
       ) +
-      annotate("text", x = max(raw_data$trial) - 2, y = 0.85, 
+      annotate("text", x = max(raw_data$trial) - 2, y = 0.75, 
                label = paste0("p(A): ", sprintf("%.2f", mean(raw_data$Probability[raw_data$Option == 'A'])), 
                               "\n p(B): ", sprintf("%.2f", mean(raw_data$Probability[raw_data$Option == 'B']))),
                hjust = 1, vjust = 1, size = 6, color = "black", fontface = "bold")
@@ -364,10 +362,10 @@ server <- function(input, output) {
       pivot_longer(cols = c(pa_1, pa_2, pb_1, pb_2), names_to = "opts", values_to = "acts") %>%
       filter(acts > -Inf) %>%
       mutate(opts = case_when(
-        opts == "pa_1" ~ paste("Option A, Outcome:", v_a1, ", Probability: ", pa),
-        opts == "pa_2" ~ paste("Option A, Outcome:", v_a2, ", Probability: ", 1 - pa),
-        opts == "pb_1" ~ paste("Option B, Outcome:", v_b1, ", Probability: ", pb),
-        opts == "pb_2" ~ paste("Option B, Outcome:", v_b2, ", Probability: ", 1 - pb)
+        opts == "pa_1" ~ paste("Option A, Outcome: ", v_a1, ", Probability: ", pa, sep = ""),
+        opts == "pa_2" ~ paste("Option A, Outcome: ", v_a2, ", Probability: ", 1 - pa, sep = ""),
+        opts == "pb_1" ~ paste("Option B, Outcome: ", v_b1, ", Probability: ", pb, sep = ""),
+        opts == "pb_2" ~ paste("Option B, Outcome: ", v_b2, ", Probability: ", 1 - pb, sep = "")
       ))
   })
   
@@ -386,7 +384,7 @@ server <- function(input, output) {
       geom_line(data = avg_data, aes(x = trial - 1, y = acts, color = opts),
                 linewidth = 1) +  
       
-      labs(x = "Trial", y = "Probability of Retrieval", title = "Probability of Retrieval") +
+      labs(x = "Trial", y = "Probability of Retrieval", title = "Probability of Retrieval", color = "Option") +
       scale_color_manual(values = c("#1b9e77", "#d95f02", "#7570b3", "#e7298a")) +  
       theme_minimal(base_size = 16) +
       theme(
@@ -411,10 +409,10 @@ server <- function(input, output) {
       pivot_longer(cols = c(aa_1, aa_2, ab_1, ab_2), names_to = "opts", values_to = "acts") %>%
       filter(acts > -Inf) %>%
       mutate(opts = case_when(
-        opts == "aa_1" ~ paste("Option A, Outcome:", v_a1, ", Probability: ", pa),
-        opts == "aa_2" ~ paste("Option A, Outcome:", v_a2, ", Probability: ", 1 - pa),
-        opts == "ab_1" ~ paste("Option B, Outcome:", v_b1, ", Probability: ", pb),
-        opts == "ab_2" ~ paste("Option B, Outcome:", v_b2, ", Probability: ", 1 - pb)
+        opts == "aa_1" ~ paste("Option A, Outcome: ", v_a1, ", Probability: ", pa, sep = ""),
+        opts == "aa_2" ~ paste("Option A, Outcome: ", v_a2, ", Probability: ", 1 - pa, sep = ""),
+        opts == "ab_1" ~ paste("Option B, Outcome: ", v_b1, ", Probability: ", pb, sep = ""),
+        opts == "ab_2" ~ paste("Option B, Outcome: ", v_b2, ", Probability: ", 1 - pb, sep = "")
       ))
   })
   
@@ -434,7 +432,7 @@ server <- function(input, output) {
       geom_line(data = avg_data, aes(x = trial - 1, y = acts, color = opts),
                 size = 1) +  
       
-      labs(x = "Trial", y = "Activation", title = "Activation Over Trials") +
+      labs(x = "Trial", y = "Activation", title = "Activation", color = "Option") +
       scale_color_manual(values = c("#1b9e77", "#d95f02", "#7570b3", "#e7298a")) +  
       theme_minimal(base_size = 16) +
       theme(
