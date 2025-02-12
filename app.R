@@ -34,7 +34,7 @@ rownames(init) <- rows
 # Define UI
 ui <- fluidPage(
   titlePanel("Shiny IBL"),
-  # following fluidRow imlements the loading message while simulation is running
+  # following fluidRow implements the loading message while simulation is running
   fluidRow(
     tags$style(type="text/css", "
                #loadmessage {
@@ -51,9 +51,6 @@ ui <- fluidPage(
                z-index: 105;
                }
                "),
-  #  conditionalPanel(condition="$('html').hasClass('shiny-busy')",
-  #                   tags$div("Loading...",id="loadmessage")
-  #  )
     ),
   sidebarLayout(
     sidebarPanel(
@@ -175,7 +172,7 @@ server <- function(input, output) {
 
       out[t] <- mean(vals[1] > vals[2]) # Calculate P(A) as proportion when BV of A > BV of B
 
-      
+      # Fixes error with NAs
       safe_softmax <- function(x) {
         x <- x - max(x, na.rm = TRUE)  # Normalize for numerical stability
         exp_x <- exp(x)
@@ -330,11 +327,11 @@ server <- function(input, output) {
   
   # Blended Value Plot
   output$bvPlot <- renderPlot({
-    raw_data <- bv_dat()  # Get raw data (all points)
+    raw_data <- bv_dat()
     
     avg_data <- raw_data %>%
       group_by(Option, trial) %>%
-      summarise(bv = mean(bv), .groups = "drop")  # Compute averages
+      summarise(bv = mean(bv), .groups = "drop")
     
     ggplot() +
       geom_point(data = raw_data, aes(x = trial - 1, y = bv, color = Option),
@@ -376,18 +373,16 @@ server <- function(input, output) {
   
   # Probability of Retrieval Plot
   output$probPlot <- renderPlot({
-    raw_data <- pr_dat()  # Get raw data (all points)
+    raw_data <- pr_dat()
     
     avg_data <- raw_data %>%
       group_by(opts, trial) %>%
       summarise(acts = mean(acts), .groups = "drop")  # Compute averages
     
     ggplot() +
-      # Plot all raw data points (individual trials)
       geom_point(data = raw_data, aes(x = trial - 1, y = acts, color = opts),
                  alpha = 0.1, size = 2) +  
       
-      # Plot trend line (averages)
       geom_line(data = avg_data, aes(x = trial - 1, y = acts, color = opts),
                 linewidth = 1) +  
       
@@ -433,11 +428,9 @@ server <- function(input, output) {
       summarise(acts = mean(acts), .groups = "drop")  # Compute averages
     
     ggplot() +
-      # Plot all raw data points (individual trials)
       geom_point(data = raw_data, aes(x = trial - 1, y = acts, color = opts),
                  alpha = 0.1, size = 2) +  
       
-      # Plot trend line (averages)
       geom_line(data = avg_data, aes(x = trial - 1, y = acts, color = opts),
                 size = 1) +  
       
