@@ -58,6 +58,7 @@ ui <- fluidPage(
       tags$h6("This is a GUI to simulate choices from the instance-based learning model. To use it:"),
       tags$h6("1. Enter the binary choice problem that you want to simulate."),
       tags$h6("2. Define the simulation settings"),
+
       tags$h6("3. Define the IBL model parameters."),
       tags$h6("4. Run the simulation."),
       h4("Define gamble values:"),
@@ -119,7 +120,6 @@ ui <- fluidPage(
         column(6, plotOutput("probPlot")),
         column(6, plotOutput("actsPlot"))
       )
-      
     )
   )
 )
@@ -451,4 +451,3 @@ server <- function(input, output) {
 
 # Run the application 
 shinyApp(ui = ui, server = server)
-
